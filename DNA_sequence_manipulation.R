@@ -1,3 +1,5 @@
+## This is is one of several files containing scripts and functions used in processing and analysis of data for Matthew Dufort's Ph.D. dissertation at the University of Minnesota, titled "Coexistence, Ecomorphology, and Diversification in the Avian Family Picidae (Woodpeckers and Allies)."
+
 # this file contains functions and scripts for trimming and concatenating sequence alignments
 # it also contains scripts for testing for base compositional heterogeneity
 

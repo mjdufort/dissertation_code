@@ -1,3 +1,5 @@
+## This is is one of several files containing scripts and functions used in processing and analysis of data for Matthew Dufort's Ph.D. dissertation at the University of Minnesota, titled "Coexistence, Ecomorphology, and Diversification in the Avian Family Picidae (Woodpeckers and Allies)."
+
 ## This includes my scripts to quantify geographic range sizes and range overlaps of Picidae species in R, using the rgeos package.
 ## it also includes scripts to generate maps of species richness
 

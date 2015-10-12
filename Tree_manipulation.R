@@ -1,3 +1,5 @@
+## This is is one of several files containing scripts and functions used in processing and analysis of data for Matthew Dufort's Ph.D. dissertation at the University of Minnesota, titled "Coexistence, Ecomorphology, and Diversification in the Avian Family Picidae (Woodpeckers and Allies)."
+
 # this file contains scripts for reading, modifying, and plotting the various phylogenetic trees used in Chapter 1 and in downstream analyses
 # it also contains scripts for calculating differences among trees, comparing trees both within this project, and with the results of previous supertree and supermatrix analyses of birds
 
