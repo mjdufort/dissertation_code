@@ -522,7 +522,6 @@ rm(i,j,k,data.tmp)
 
 ### convert to complete data set (remove taxa with not enough data, and impute data for those with only a single measurement missing)
 
-
 findTaxaExclude <- function(data, threshold=1, ident="My_genus_species") {
   # this function counts up the NAs in a data frame, and returns a vector of the identifiers (as ident) of members that have more NAs than threshold
   na_counts <- rep(NA, (nrow(data)))
@@ -535,29 +534,14 @@ findTaxaExclude <- function(data, threshold=1, ident="My_genus_species") {
 }
 
 # identify taxa that don't have enough data to use
-picidae.taxa.exclude$not_enough_data <- list()
-picidae.taxa.exclude$not_enough_data$all_vars <- findTaxaExclude(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[["all_vars"]][["all_inds"]][["all_species"]][["no_resids"]]) # taxa to remove due to not enough data (anything with NA in more than one field); this is the same regardless of how I impute data or treat residuals, and there are none for complete_ind_only
-# same thing, for data without pygostyle (because that has a different set of incomplete taxa)
-picidae.taxa.exclude$not_enough_data$no_pygo <- findTaxaExclude(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[["no_pygo"]][["all_inds"]][["all_species"]][["no_resids"]]) # taxa to remove due to not enough data (anything with NA in more than one field); this is the same regardless of how I impute data or treat residuals, and there are none for complete_ind_only
+picidae.taxa.exclude$not_enough_data  <- findTaxaExclude(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[["all_inds"]])  # taxa to remove due to not enough data (anything with NA in more than one field); this is the same regardless of how I impute data or treat residuals, and there are none for complete_ind
 
-
-## by including the pygostyle measurements, I lose Colaptes_fernandinae, Melanerpes_chrysauchen, Micropternus_brachyurus, Picoides_temminckii, Picumnus_nebulosus, Picumnus_squamulatus, Veniliornis_kirkii (if I require each species to have all but one measurement)
-# by inferring pygo_width from pygo_length, I could get back Micropternus_brachyurus and Picoides_temminckii; probably not worth it
-
-# create a new list of data frames, minus the taxa that don't have enough data
+## create a new list of data frames, minus the taxa that don't have enough data
 picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa <- list()
-for (i in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed)) {  # loop over variable inclusion
-  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]] <- list()
-  for (j in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]])) {  # loop over individual inclusion
-    picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]][[j]] <- list()
-    for (k in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]][[j]])) {  # loop over species inclusion
-      picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]][[j]][[k]] <- list()
-      for (l in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]][[j]][[k]])) {  # loop over residual method
-        picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[c(i,j,k,l)]] <- subset(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[c(i,j,k,l)]], !(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[c(i,j,k,l)]]$My_genus_species %in% picidae.taxa.exclude$not_enough_data[[i]])) # modify the data frame to remove those taxa; no need to do this for complete_ind_only, as all taxa have all data in that set, but I did it for all, so that I would have one consistent data object to use
-      }
-    }
-  }
+for (i in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed)) {  # loop over individual inclusion
+  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]] <-  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]] <- subset(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]], !(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]]$My_genus_species %in% picidae.taxa.exclude$not_enough_data[[i]])) # modify the data frame to remove those taxa; no need to do this for complete_ind_only, as all taxa have all data in that set, but I did it for all, so that I would have one consistent data object to use
 }
+rm(i)
 
 
 ### impute missing data, where one measurement is missing from a given taxon
@@ -747,7 +731,7 @@ rm(i)
 picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca <- list()
 for (i in names(picidae.morph.log.fully_reduced.geomean_scaled)) {  # loop over individual inclusion
   cat("Starting", i, "\n", sep=" ")
-  picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]] <- wrappedPhylPCA(data = picidae.morph.log.fully_reduced.geomean_scaled[[c(i,j,k,l)]][["data.geomean_scaled"]], pca_cols=2:ncol(picidae.morph.log.fully_reduced.geomean_scaled[[c(i,j,k,l)]][["data.geomean_scaled"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1)  # conduct the phylogenetic on the current data set
+  picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]] <- wrappedPhylPCA(data = picidae.morph.log.fully_reduced.geomean_scaled[[i]][["data.geomean_scaled"]], pca_cols=2:ncol(picidae.morph.log.fully_reduced.geomean_scaled[[i]][["data.geomean_scaled"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1)  # conduct the phylogenetic on the current data set
 }
 rm(i)
 
