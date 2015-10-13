@@ -31,10 +31,10 @@ rm(taxa.remove.final_trees)
 ## load the absolute and scaled overlaps from Quantifying_distribution_overlaps.R
 load(file='Picidae_overlaps.RData')
 
-## the function reduceToMeanByCols() is a wrapper for ddply to reduce a data frame by a set of factor or character variables (reduce_colnames), taking the means of another set of variables (column numbers in mean_cols)
+## the function reduceToMean.ByCols() is a wrapper for ddply to reduce a data frame by a set of factor or character variables (reduce_colnames), taking the means of another set of variables (column numbers in mean_cols)
 # as input, it takes data (a data frame), reduce_colnames (the names of the columns to reduce by), and mean_cols (the columns to take means of over the factors in reduce_colnames)
 # it returns a data frame reduced to having only one row for each combination of the values in reduce_colnames
-reduceToMeanByCols <- function(data, reduce_colnames, mean_cols) {
+reduceToMean.ByCols <- function(data, reduce_colnames, mean_cols) {
   library(plyr)
   data.reduced <- ddply(.data=data, .variables=reduce_colnames, function(x){
     y <- subset(x, select=mean_cols)
@@ -147,17 +147,17 @@ for (i in picidae.species.names) {  # loop over taxon
 rm(i,j)
 
 picidae.morph_from_images$log <- picidae.morph_from_images$log[-grep("depth", colnames(picidae.morph_from_images$log))]  # strip out maxilla_depth, because it's not very reproducible
-picidae.morph_from_images$log.reduced_inds <- reduceToMeanByCols(picidae.morph_from_images$log, reduce_colnames="Inst_CatNum", mean_cols=6:ncol(picidae.morph_from_images$log))  # calculate averages by individual where there are multiple measurements of a single individual
+picidae.morph_from_images$log.reduced_inds <- reduceToMean.ByCols(picidae.morph_from_images$log, reduce_colnames="Inst_CatNum", mean_cols=6:ncol(picidae.morph_from_images$log))  # calculate averages by individual where there are multiple measurements of a single individual
 
 
 ### quantify date variation in calipers and adjust for it
 
 
-## the function caliperVariationSumSq() calculates the summed squared deviations from expected values of measurements, given a slope, intercept, and a date-by-date adjustment factor for the slope or intercept; it is used for optimizing the values of these parameters
+## the function caliperVariation.sumsq() calculates the summed squared deviations from expected values of measurements, given a slope, intercept, and a date-by-date adjustment factor for the slope or intercept; it is used for optimizing the values of these parameters
 # as input, it takes pars (a vector containing the proposed values of slope or intercept, and the values of date.adjust, which are date-specific intercepts or slopes), obs (a matrix of measurement values for a single individual, with dates), and fitmethod (if fitmethod="slope", it assumes pars[1] is a universal intercept and pars[2:length(pars)] are date-specific slopes; if fitmethod="intercept", it assumes pars[1] is a universal slope and pars[2:length(pars)] are date-specific intercepts)
 # both the data in obs and the parameter values in pars should be sorted in the same order
 # in either case, the universal parameter is pars[1], and the date-specific parameters are pars[2:length(pars)]
-caliperVariationSumSq <- function(pars, obs, fitmethod, quiet=TRUE) {
+caliperVariation.sumsq <- function(pars, obs, fitmethod, quiet=TRUE) {
   obs.mean <- matrix(apply(obs, MARGIN=2, FUN=mean, na.rm=TRUE), nrow=1)  # calculate the mean values of each variable
   date.adjust <- as.matrix(pars[2:length(pars)], byrow=TRUE)  # extract the date-specific parameter values
   if (fitmethod == "slope") {
@@ -172,10 +172,10 @@ caliperVariationSumSq <- function(pars, obs, fitmethod, quiet=TRUE) {
   return(sumsq)
 }
 
-## the function optimizeCaliperVariation() finds the optimum values of a universal slope or intercept and date-specific intercepts or slopes
+## the function optimize.caliperVariation() finds the optimum values of a universal slope or intercept and date-specific intercepts or slopes
 # as input, it takes obs.with_dates (a matrix of measurements from a single individual with the dates of measurements in the first column), and fitmethod (if fitmethod="slope", it assumes pars[1] is a universal intercept and pars[2:length(pars)] are date-specific slopes; if fitmethod="intercept", it assumes pars[1] is a universal slope and pars[2:length(pars)] are date-specific intercepts)
 # it returns a list containing the method used ("slope" or "intercept"), the value of the fixed parameter, the values of the date-specific parameter, and the sum of squared deviations using the optimized parameter values
-optimizeCaliperVariation <- function(obs.with_dates, fitmethod, quiet=TRUE) {
+optimize.caliperVariation <- function(obs.with_dates, fitmethod, quiet=TRUE) {
   dates <- obs.with_dates[,1]  # extract the dates from the data matrix
   obs.no_dates <- obs.with_dates[,-1]  # extract data without dates from the data matrix
   
@@ -183,7 +183,7 @@ optimizeCaliperVariation <- function(obs.with_dates, fitmethod, quiet=TRUE) {
   if (fitmethod=="intercept") {inits <- c(1,rep(0,times=nrow(obs.no_dates)))}
   if (fitmethod=="slope") {inits <- c(0, rep(1,times=nrow(obs.no_dates)))}
   
-  date.adjustments.optimized <- optim(inits, fn=caliperVariationSumSq, obs=obs.no_dates, fitmethod=fitmethod, quiet=quiet, method="BFGS")  # optimize the parameters
+  date.adjustments.optimized <- optim(inits, fn=caliperVariation.sumsq, obs=obs.no_dates, fitmethod=fitmethod, quiet=quiet, method="BFGS")  # optimize the parameters
   if (!quiet) print(date.adjustments.optimized)
   date.adjusts <- date.adjustments.optimized$par[2:length(date.adjustments.optimized$par)]  # extract the date-specific parameter values from the list returned by parameter optimization
   names(date.adjusts) <- dates  # assign dates as names for the elements of the vector containing date-specific parameters
@@ -191,12 +191,12 @@ optimizeCaliperVariation <- function(obs.with_dates, fitmethod, quiet=TRUE) {
 }
 
 obs.Mel_car.reference <- picidae.morph.log.reduced_var$base[picidae.morph.log.reduced_var$base$Inst_CatNum=="BellMNH_47191",-(2:5)] # subset the data for the columns I want and only the reference Melanerpes carolinus
-caliper.variation.optimized_slope.Mel_car.reference <- optimizeCaliperVariation(obs.Mel_car.reference, fitmethod="slope", quiet=FALSE)  # optimize parameter values with fixed intercept and date-specific slope
-caliper.variation.optimized_intercept.Mel_car.reference <- optimizeCaliperVariation(obs.Mel_car.reference, fitmethod="intercept", quiet=FALSE)  # optimize parameter values with fixed slope and date-specific intercept
+caliper.variation.optimized_slope.Mel_car.reference <- optimize.caliperVariation(obs.Mel_car.reference, fitmethod="slope", quiet=FALSE)  # optimize parameter values with fixed intercept and date-specific slope
+caliper.variation.optimized_intercept.Mel_car.reference <- optimize.caliperVariation(obs.Mel_car.reference, fitmethod="intercept", quiet=FALSE)  # optimize parameter values with fixed slope and date-specific intercept
 
 obs.Sph_var.reference <- picidae.morph.log.reduced_var$base[picidae.morph.log.reduced_var$base$Inst_CatNum=="BellMNH_47202",-(2:5)] # subset the data for the columns I want and only the reference Sphyrapicus varius
-caliper.variation.optimized_slope.Sph_var.reference <- optimizeCaliperVariation(obs.Sph_var.reference, fitmethod="slope", quiet=FALSE)  # optimize parameter values with fixed intercept and date-specific slope
-caliper.variation.optimized_intercept.Sph_var.reference <- optimizeCaliperVariation(obs.Sph_var.reference, fitmethod="intercept", quiet=FALSE)  # optimize parameter values with fixed slope and date-specific intercept
+caliper.variation.optimized_slope.Sph_var.reference <- optimize.caliperVariation(obs.Sph_var.reference, fitmethod="slope", quiet=FALSE)  # optimize parameter values with fixed intercept and date-specific slope
+caliper.variation.optimized_intercept.Sph_var.reference <- optimize.caliperVariation(obs.Sph_var.reference, fitmethod="intercept", quiet=FALSE)  # optimize parameter values with fixed slope and date-specific intercept
 
 ## for both reference specimens, sumsq is definitely lower with date-specific slopes!; date adjust values are fairly similar between Mel_car and Sph_var when the adjustment values are large (which is when they matter)
 
@@ -212,10 +212,10 @@ rm(obs.Mel_car.reference, obs.Sph_var.reference, caliper.variation.optimized_int
 ### next step is to  generate adjustments for the data, and apply them to the data set; this requires calculating some second-order adjustments, as I don't have reference measurements for every date
 ## the set of functions below uses deviations between measurements of the same specimen on different takes to find optimal adjustments to intercept or slope for a date without adjustments based on reference specimens
 
-## the function interceptSumsq() calculates the sum of squared deviations for use in optimizing the intercept for date adjustment of data
+## the function intercept.sumsq() calculates the sum of squared deviations for use in optimizing the intercept for date adjustment of data
 # as input, it takes intercept.new (the proposed intercept for the new date), intercept.orig (the intercept for the date with adjustment already determined), slope (the slope), data (the data as a data frame, including only specimens for which measurements are present for both dates), date.new (the date for which we're calculating a new intercept), and date.orig (the date for which we have an intercept)
 # it returns the sum of the squared deviations between the data for each date, for specimens with measurements for both dates, after adjusting data from both dates using the given values of intercepts and slope. 
-interceptSumsq <- function(intercept.new, intercept.orig, slope, data, date.new, date.orig) {
+intercept.sumsq <- function(intercept.new, intercept.orig, slope, data, date.new, date.orig) {
   sums <- 0  # intialize a numeric to store the sum or squared differences
   Inst_CatNums <- unique(data$Inst_CatNum)  # extract a vector of individual IDs
   for (i in 1:length(Inst_CatNums)) {  # loop over individuals
@@ -225,9 +225,9 @@ interceptSumsq <- function(intercept.new, intercept.orig, slope, data, date.new,
   return(sums)
 }
 
-## the function slopeSumsq() calculates the sum of squared deviations for use in optimizing the slope for date adjustment of data
-# inputs and value returned are same as for interceptSumsq(), except that there is a single intercept and date-specific slopes
-slopeSumsq <- function(slope.new, slope.orig, intercept, data, date.new, date.orig) {
+## the function slope.sumsq() calculates the sum of squared deviations for use in optimizing the slope for date adjustment of data
+# inputs and value returned are same as for intercept.sumsq(), except that there is a single intercept and date-specific slopes
+slope.sumsq <- function(slope.new, slope.orig, intercept, data, date.new, date.orig) {
   sums <- 0  # intialize a numeric to store the sum or squared differences
   Inst_CatNums <- unique(data$Inst_CatNum)  # extract a vector of individual IDs
   for (i in 1:length(Inst_CatNums)) {  # loop over individuals
@@ -237,19 +237,19 @@ slopeSumsq <- function(slope.new, slope.orig, intercept, data, date.new, date.or
   return(sums)
 }
 
-## the function interceptNewdate() calculates the best intercept for a new date using data from specimens measured on both the new date and a date for which a calculated intercept already exists
+## the function intercept.newDate() calculates the best intercept for a new date using data from specimens measured on both the new date and a date for which a calculated intercept already exists
 # as input, it takes intercept.orig (the calculated intercept for the date with adjustment already determined), slope (the value of the slope), data (the data as a data frame, including only specimens for which measurements are present for both dates), date.new (the date for which an intercept is to be calculated), and date.orig (the date for which an intercept has already been calculated)
 # it returns a list containing the optimized value of the intercept for use in adjustment of data for date variation, and the sum of squared deviations using the optimum value
-interceptNewdate <- function(intercept.orig, slope, data, date.new, date.orig) {
-  optimized.intercept.new <- optimize(f=interceptSumsq, interval=c(-0.1,0.1), intercept.orig=intercept.orig, slope=slope, data=data, date.new=date.new, date.orig=date.orig)  # use the interceptSumsq function to optimize the intercept for the new date
+intercept.newDate <- function(intercept.orig, slope, data, date.new, date.orig) {
+  optimized.intercept.new <- optimize(f=intercept.sumsq, interval=c(-0.1,0.1), intercept.orig=intercept.orig, slope=slope, data=data, date.new=date.new, date.orig=date.orig)  # use the intercept.sumsq function to optimize the intercept for the new date
   return(list(intercept.optimized=optimized.intercept.new$minimum, sumsq=optimized.intercept.new$objective))
 }
 
-## the function slopeNewdate() calculates the best slope for a new date using data from specimens measured on both the new date and a date for which a calculated slope already exists
-# inputs and value returned are same as for interceptNewdate(), except that there is a single intercept and date-specific slopes
-slopeNewdate <- function(slope.orig, intercept, data, date.new, date.orig) {
-  optimized.slope.new <- optimize(f=slopeSumsq, interval=c(-0.99,1.01), slope.orig=slope.orig, intercept=intercept, data=data, date.new=date.new, date.orig=date.orig)
-  return(list(slope.optimized=optimized.slope.new$minimum, sumsq=optimized.slope.new$objective))  # use the slopeSumsq function to optimize the slope for the new date
+## the function slope.newDate() calculates the best slope for a new date using data from specimens measured on both the new date and a date for which a calculated slope already exists
+# inputs and value returned are same as for intercept.newDate(), except that there is a single intercept and date-specific slopes
+slope.newDate <- function(slope.orig, intercept, data, date.new, date.orig) {
+  optimized.slope.new <- optimize(f=slope.sumsq, interval=c(-0.99,1.01), slope.orig=slope.orig, intercept=intercept, data=data, date.new=date.new, date.orig=date.orig)
+  return(list(slope.optimized=optimized.slope.new$minimum, sumsq=optimized.slope.new$objective))  # use the slope.sumsq function to optimize the slope for the new date
 }
 
 
@@ -269,11 +269,11 @@ inst_catnum.overlapping.1 <- inst_catnum.no_reference.1[inst_catnum.no_reference
 picidae.morph.log.reduced_var$base[picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.1,]  # output data for those specimens; use the dates from this output to identify dates for the next step
 
 # first date
-slope.optimized.date1 <- slopeNewdate(slope.orig=caliper.adjust$date.slopes["2013-10-21"], intercept=caliper.adjust$intercept, data=picidae.morph.log.reduced_var$base[(picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.1) & picidae.morph.log.reduced_var$base$Data_date %in% as.Date(c("2011-08-04", "2013-10-21")), -c(3:5)], date.new=as.Date("2011-08-04"), date.orig=as.Date("2013-10-21"))  # find the optimal slope for the new date, as the slope that minimizes the squared deviations between the adjusted values for the measurements from the two dates
+slope.optimized.date1 <- slope.newDate(slope.orig=caliper.adjust$date.slopes["2013-10-21"], intercept=caliper.adjust$intercept, data=picidae.morph.log.reduced_var$base[(picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.1) & picidae.morph.log.reduced_var$base$Data_date %in% as.Date(c("2011-08-04", "2013-10-21")), -c(3:5)], date.new=as.Date("2011-08-04"), date.orig=as.Date("2013-10-21"))  # find the optimal slope for the new date, as the slope that minimizes the squared deviations between the adjusted values for the measurements from the two dates
 caliper.adjust$date.slopes["2011-08-04"] <- slope.optimized.date1$slope.optimized  # store the calculated slope in my vector containing all date-specific slopes
 
 # second date
-slope.optimized.date2 <- slopeNewdate(slope.orig=caliper.adjust$date.slope["2013-09-11"], intercept=caliper.adjust$intercept, data=picidae.morph.log.reduced_var$base[(picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.1) & picidae.morph.log.reduced_var$base$Data_date %in% as.Date(c("2012-06-07", "2013-09-11")), -c(3:5)], date.new=as.Date("2012-06-07"), date.orig=as.Date("2013-09-11"))  # find the optimal slope for the new date, as the slope that minimizes the squared deviations between the adjusted values for the measurements from the two dates
+slope.optimized.date2 <- slope.newDate(slope.orig=caliper.adjust$date.slope["2013-09-11"], intercept=caliper.adjust$intercept, data=picidae.morph.log.reduced_var$base[(picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.1) & picidae.morph.log.reduced_var$base$Data_date %in% as.Date(c("2012-06-07", "2013-09-11")), -c(3:5)], date.new=as.Date("2012-06-07"), date.orig=as.Date("2013-09-11"))  # find the optimal slope for the new date, as the slope that minimizes the squared deviations between the adjusted values for the measurements from the two dates
 caliper.adjust$date.slopes["2012-06-07"] <- slope.optimized.date2$slope.optimized  # store the calculated slope in my vector containing all date-specific slopes
 
 # round 2; using second-order intersections of data with dates reference data
@@ -285,7 +285,7 @@ inst_catnum.overlapping.2 <- inst_catnum.no_reference.2[inst_catnum.no_reference
 picidae.morph.log.reduced_var$base[picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.2,]  # output data for those specimens; use the dates from this output to identify dates for the next step
 
 # third date
-slope.optimized.date3 <- slopeNewdate(slope.orig=caliper.adjust$date.slopes["2012-06-07"], intercept=caliper.variation.optimized_slope.averaged$intercept, data=picidae.morph.log.reduced_var$base[(picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.2) & picidae.morph.log.reduced_var$base$Data_date %in% as.Date(c("2011-12-09","2012-06-07")), -c(3:5,10:11)], date.new=as.Date("2011-12-09"), date.orig=as.Date("2012-06-07"))  # find the optimal slope for the new date, as the slope that minimizes the squared deviations between the adjusted values for the measurements from the two dates
+slope.optimized.date3 <- slope.newDate(slope.orig=caliper.adjust$date.slopes["2012-06-07"], intercept=caliper.variation.optimized_slope.averaged$intercept, data=picidae.morph.log.reduced_var$base[(picidae.morph.log.reduced_var$base$Inst_CatNum %in% inst_catnum.overlapping.2) & picidae.morph.log.reduced_var$base$Data_date %in% as.Date(c("2011-12-09","2012-06-07")), -c(3:5,10:11)], date.new=as.Date("2011-12-09"), date.orig=as.Date("2012-06-07"))  # find the optimal slope for the new date, as the slope that minimizes the squared deviations between the adjusted values for the measurements from the two dates
 caliper.adjust$date.slopes["2011-12-09"] <- slope.optimized.date3$slope.optimized  # store the calculated slope in my vector containing all date-specific slopes
 
 # round 3; using third-order intersections of data with dates reference data
@@ -325,7 +325,7 @@ rm(i)
 
 ## calculate the mean of all measurements for each individual (for cases where the same individual had the same character measured >1 times)
 picidae.morph.log.reduced_var_inds <- list()  # create a list to store data reduced to a single row per individual
-picidae.morph.log.reduced_var_inds$adjusted_date <- reduceToMeanByCols(picidae.morph.log.reduced_var$adjusted_date, reduce_colnames=c("Inst_CatNum","My_genus_species","Sex"), mean_cols=-(1:5))  # take means by individual
+picidae.morph.log.reduced_var_inds$adjusted_date <- reduceToMean.ByCols(picidae.morph.log.reduced_var$adjusted_date, reduce_colnames=c("Inst_CatNum","My_genus_species","Sex"), mean_cols=-(1:5))  # take means by individual
 picidae.morph_from_images$log.reduced_inds$Inst_CatNum[!(picidae.morph_from_images$log.reduced_inds$Inst_CatNum %in% picidae.morph.log.reduced_var_inds$adjusted_date$Inst_CatNum)]  # check for individuals in the measurements from images but not in the measurements from calipers; this avoids picking up those that were excluded earlier; there should be few to none of these, and might indicate mismatched Inst_CatNum between the image data and caliper data
 picidae.morph.log.reduced_var_inds$adjusted_date$Inst_CatNum[!(picidae.morph.log.reduced_var_inds$adjusted_date$Inst_CatNum %in% picidae.morph_from_images$log.reduced_inds$Inst_CatNum)]  # check for individuals in the measurements from calipers but not in the measurements from images; this avoids picking up those that were excluded earlier; these should be individuals that had no skulls or unmeasurable skulls
 
@@ -340,7 +340,7 @@ picidae.morph_combined.log.reduced_var_inds$complete_ind_only <- subset(picidae.
 ## find the mean of all measurements for each sex for each species; basically, this reduces the data to one average representative per sex per species
 picidae.morph_combined.log.reduced_var_inds_sex <- list() # create a list to store the data reduced to one row per sex per species
 for (i in names(picidae.morph_combined.log.reduced_var_inds)) {  # loop over individual inclusion
-    picidae.morph_combined.log.reduced_var_inds_sex[[i]] <- reduceToMeanByCols(picidae.morph_combined.log.reduced_var_inds[[i]], reduce_colnames=c("My_genus_species","Sex"), mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds[[i]]))
+    picidae.morph_combined.log.reduced_var_inds_sex[[i]] <- reduceToMean.ByCols(picidae.morph_combined.log.reduced_var_inds[[i]], reduce_colnames=c("My_genus_species","Sex"), mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds[[i]]))
 }
 rm(i)
 
@@ -380,18 +380,18 @@ rm(i)
 ## find the mean of all measurements for each taxon, averaging across sexes
 picidae.morph_combined.log.reduced_var_inds_sex_taxa <- list()
 for (i in names(picidae.morph_combined.taxa_by_mf)) {  # loop over individual inclusion
-  picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]] <- reduceToMeanByCols(data = subset(picidae.morph_combined.log.reduced_var_inds_sex[[i]], subset=((Sex %in% c("F","M")) & (My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]]$female_male) & !(My_genus_species %in% picidae.taxa.exclude$not_species))), reduce_colnames="My_genus_species", mean_cols=3:ncol(picidae.morph_combined.log.reduced_var_inds_sex[[i]]))  # calculate means by species with only species where I have both males and females; it checks against the vector containing taxa with both males and females; it also only includes rows of data where the sex is "M" or "F"
-  picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]] <- rbind(picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]], reduceToMeanByCols(data = subset(picidae.morph_combined.log.reduced_var_inds[[i]], subset=(My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]]$no_female_male) & !(My_genus_species %in% picidae.taxa.exclude$not_species)), reduce_colnames="My_genus_species", mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds[[i]])))  # add in the species that are missing either males or females or both, using the averages of ALL INDIVIDUALS, not just the mean of each sex
+  picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]] <- reduceToMean.ByCols(data = subset(picidae.morph_combined.log.reduced_var_inds_sex[[i]], subset=((Sex %in% c("F","M")) & (My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]]$female_male) & !(My_genus_species %in% picidae.taxa.exclude$not_species))), reduce_colnames="My_genus_species", mean_cols=3:ncol(picidae.morph_combined.log.reduced_var_inds_sex[[i]]))  # calculate means by species with only species where I have both males and females; it checks against the vector containing taxa with both males and females; it also only includes rows of data where the sex is "M" or "F"
+  picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]] <- rbind(picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]], reduceToMean.ByCols(data = subset(picidae.morph_combined.log.reduced_var_inds[[i]], subset=(My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]]$no_female_male) & !(My_genus_species %in% picidae.taxa.exclude$not_species)), reduce_colnames="My_genus_species", mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds[[i]])))  # add in the species that are missing either males or females or both, using the averages of ALL INDIVIDUALS, not just the mean of each sex
 }
 rm(i)
 
 
 ### impute data without ramphotheca from measurements with ramphotheca (to standardize the measurements)
 
-## the function imputeRampAbsent() fits models of ramp_absent data to ramp_present data, and imputes missing data (for species or individuals) using stochastic imputation based on those models (with a number of options)
+## the function impute.ramp_absent() fits models of ramp_absent data to ramp_present data, and imputes missing data (for species or individuals) using stochastic imputation based on those models (with a number of options)
 # as input, it takes data_by_species (the data with means by species), impute_fields (names of fields to impute), data_by_inds (the data with means by individual, unnecessary if species_inds="species"), model_fitting ("pgls" for PGLS model, "lm" for non-phylogenetic model), phy (the phylogeny, required if fitting with PGLS), species_inds ("species" to impute by species, "inds" to impute by individuals), return_models (boolean for whether to return the results of model fitting), return_treedata (boolean for whether to return the treedata objects used in PGLS fitting)
 # it returns a list containing a data frame with imputed data where it was absent for ramp_absent, imputed either by individuals or by species, optionally the model fits and values of pseudo-R^2, and optionally treedata objects used in PGLS mdoel fitting
-imputeRampAbsent <- function(data_by_species, impute_fields, data_by_inds=NULL, model_fitting="pgls", phy=NULL, species_inds="species", return_models=FALSE, return_treedata=FALSE) {
+impute.ramp_absent <- function(data_by_species, impute_fields, data_by_inds=NULL, model_fitting="pgls", phy=NULL, species_inds="species", return_models=FALSE, return_treedata=FALSE) {
   require(ape)
   require(nlme)
   require(geiger)
@@ -481,22 +481,22 @@ imputeRampAbsent <- function(data_by_species, impute_fields, data_by_inds=NULL, 
 ## generate new data frames to store imputed values for individuals with ramphotheca absent
 picidae.morph_combined.log.reduced_var_inds.imputed <- list()
 for (i in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa)) {  # loop over individual inclusion
-    picidae.morph_combined.log.reduced_var_inds.imputed[[i]] <- imputeRampAbsent(data_by_species=picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]], data_by_inds=picidae.morph_combined.log.reduced_var_inds[[i]], phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, impute_fields = c("Cranium_GL", "Cranium_OC", "Mandible_mean", "Maxilla_length"), model_fitting="pgls", species_inds="inds", return_models=TRUE, use_resids=l)
+    picidae.morph_combined.log.reduced_var_inds.imputed[[i]] <- impute.ramp_absent(data_by_species=picidae.morph_combined.log.reduced_var_inds_sex_taxa[[i]], data_by_inds=picidae.morph_combined.log.reduced_var_inds[[i]], phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, impute_fields = c("Cranium_GL", "Cranium_OC", "Mandible_mean", "Maxilla_length"), model_fitting="pgls", species_inds="inds", return_models=TRUE, use_resids=l)
 }
 rm(i)
 
 ## now re-aggregate the data by sex, exactly as I did it before
 picidae.morph_combined.log.reduced_var_inds_sex.imputed <- list()
 for (i in names(picidae.morph_combined.log.reduced_var_inds.imputed)) {  # loop over individual inclusion
-    picidae.morph_combined.log.reduced_var_inds_sex.imputed[[i]] <- reduceToMeanByCols(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]], reduce_colnames=c("My_genus_species", "Sex"), mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]]))
+    picidae.morph_combined.log.reduced_var_inds_sex.imputed[[i]] <- reduceToMean.ByCols(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]], reduce_colnames=c("My_genus_species", "Sex"), mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]]))
 }
 rm(i)
 
 ## now re-aggregate the data by taxon, exactly as I did it before
 picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed <- list()
 for (i in names(picidae.morph_combined.log.reduced_var_inds_sex.imputed)) {  # loop over individual inclusion
-  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]] <- reduceToMeanByCols(data = subset(picidae.morph_combined.log.reduced_var_inds_sex.imputed[[i]], subset=((Sex %in% c("F","M")) & (My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]][["female_male"]]) & !(My_genus_species %in% picidae.taxa.exclude$not_species))), reduce_colnames="My_genus_species", mean_cols = 3:ncol(picidae.morph_combined.log.reduced_var_inds_sex.imputed[[i]]))  # calculate means by species with only species where I have both males and females; it checks against the vector containing taxa with both males and females; it also only includes rows of data where the sex is "M" or "F"
-  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]] <- rbind(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]], reduceToMeanByCols(data = subset(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]], subset=(My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]][["no_female_male"]]) & !(My_genus_species %in% picidae.taxa.exclude$not_species)), reduce_colnames="My_genus_species", mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]])))
+  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]] <- reduceToMean.ByCols(data = subset(picidae.morph_combined.log.reduced_var_inds_sex.imputed[[i]], subset=((Sex %in% c("F","M")) & (My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]][["female_male"]]) & !(My_genus_species %in% picidae.taxa.exclude$not_species))), reduce_colnames="My_genus_species", mean_cols = 3:ncol(picidae.morph_combined.log.reduced_var_inds_sex.imputed[[i]]))  # calculate means by species with only species where I have both males and females; it checks against the vector containing taxa with both males and females; it also only includes rows of data where the sex is "M" or "F"
+  picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]] <- rbind(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]], reduceToMean.ByCols(data = subset(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]], subset=(My_genus_species %in% picidae.morph_combined.taxa_by_mf[[i]][["no_female_male"]]) & !(My_genus_species %in% picidae.taxa.exclude$not_species)), reduce_colnames="My_genus_species", mean_cols=4:ncol(picidae.morph_combined.log.reduced_var_inds.imputed[[i]][["data.imputed"]])))
   picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]] <- picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]][order(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[[i]]$My_genus_species),] # sort by My_genus_species, to make things simpler
 }
 rm(i)
@@ -522,7 +522,7 @@ rm(i,j,k,data.tmp)
 
 ### convert to complete data set (remove taxa with not enough data, and impute data for those with only a single measurement missing)
 
-findTaxaExclude <- function(data, threshold=1, ident="My_genus_species") {
+find.taxaExclude <- function(data, threshold=1, ident="My_genus_species") {
   # this function counts up the NAs in a data frame, and returns a vector of the identifiers (as ident) of members that have more NAs than threshold
   na_counts <- rep(NA, (nrow(data)))
   for (i in 1:nrow(data)) {
@@ -534,7 +534,7 @@ findTaxaExclude <- function(data, threshold=1, ident="My_genus_species") {
 }
 
 # identify taxa that don't have enough data to use
-picidae.taxa.exclude$not_enough_data  <- findTaxaExclude(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[["all_inds"]])  # taxa to remove due to not enough data (anything with NA in more than one field); this is the same regardless of how I impute data or treat residuals, and there are none for complete_ind
+picidae.taxa.exclude$not_enough_data  <- find.taxaExclude(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed[["all_inds"]])  # taxa to remove due to not enough data (anything with NA in more than one field); this is the same regardless of how I impute data or treat residuals, and there are none for complete_ind
 
 ## create a new list of data frames, minus the taxa that don't have enough data
 picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa <- list()
@@ -546,9 +546,9 @@ rm(i)
 
 ### impute missing data, where one measurement is missing from a given taxon
 
-## the function imputeMissingVars() uses stochastic imputation to impute data for species missing data for only one variable; it loops over each variable that has NAs, building models from all the other variables (complete cases only), then filling in the NAs based on those models where possible
+## the function impute.missingVars() uses stochastic imputation to impute data for species missing data for only one variable; it loops over each variable that has NAs, building models from all the other variables (complete cases only), then filling in the NAs based on those models where possible
 # as input, it takes data (as a data frame containing species means), phy (phylogeny, required if model_fitting="pgls"), model_fitting (if "pgls" fits a PGLS model, if "lm" fits a non-phylogenetic model), return_models (boolean for whether to return model fits)
-imputeMissingVars <- function(data, phy=NULL, model_fitting="pgls", return_models=FALSE) {
+impute.missingVars <- function(data, phy=NULL, model_fitting="pgls", return_models=FALSE) {
   require(ape)
   require(geiger)
   require(nlme)
@@ -611,7 +611,7 @@ imputeMissingVars <- function(data, phy=NULL, model_fitting="pgls", return_model
 # don't need to do this for complete_ind_only, because they don't have any NAs; but I'm including those in this list so that I have one consistent data object to use
 picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa.imputed <- list()
 for (i in names(picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa)) {  # loop over individual inclusion
-    picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa.imputed[[i]] <- imputeMissingVars(data=picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]], phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, model_fitting="pgls", return_models=TRUE)
+    picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa.imputed[[i]] <- impute.missingVars(data=picidae.morph_combined.log.reduced_var_inds_sex_taxa.imputed.rm_taxa[[i]], phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, model_fitting="pgls", return_models=TRUE)
 }
 rm(i)
 
@@ -620,11 +620,11 @@ picidae.morph.log.fully_reduced <- picidae.morph_combined.log.reduced_var_inds_s
 
 ### create data variants (geomean, treedata objects, size-scaled shape variables)
 
-## the function sizeScalePGLS() takes a data frame of log-transformed data values, with values to scale in scale_cols, and a tree containing the taxa those data represent, and adds a geomean column to the end, then scales the variables in scale_cols by the geomean (by finding the residuals from PGLS regression of each variable on the geomean)
+## the function sizeScale.pgls() takes a data frame of log-transformed data values, with values to scale in scale_cols, and a tree containing the taxa those data represent, and adds a geomean column to the end, then scales the variables in scale_cols by the geomean (by finding the residuals from PGLS regression of each variable on the geomean)
 #  it can do this with incomplete overlap in taxa; it uses treedata to drop the taxa not found in both, and outputs a list of the taxa that were dropped
 # as input, it takes data (a data frame containing species means), scale_cols (vector of numbers of columns to scale), phy (phylogeny), name_col (name or number of the column of the data frame with the taxon names), keep_geomean (boolean to retain the geomean column in the returned data frame), return_models (boolean to return the model fits), and optional methods to pass to the gls function for PGLS model fitting
 # it returns either a data frame with the size-scaled data (with or without geomean) or a list containing the size-scaled data and the model fits
-sizeScalePGLS <- function(data, scale_cols, phy, name_col, keep_geomean=FALSE, return_models=FALSE, method="ML", control=list()) {
+sizeScale.pgls <- function(data, scale_cols, phy, name_col, keep_geomean=FALSE, return_models=FALSE, method="ML", control=list()) {
   require(geiger)
   require(nlme)
   scale_cols <- scale_cols[order(scale_cols)]  # put the columns to scale in order (makes things easier)
@@ -691,7 +691,7 @@ rm(i)
 picidae.morph.log.fully_reduced.geomean_scaled <- list()
 for (i in names(picidae.morph.log.fully_reduced)) {  # loop over individual inclusion
   cat("Starting", i, "\n", sep=" ")
-  picidae.morph.log.fully_reduced.geomean_scaled[[i]] <- sizeScalePGLS(data = picidae.morph.log.fully_reduced[[i]][["data.imputed"]], scale_cols=2:ncol(picidae.morph.log.fully_reduced[[i]][["data.imputed"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1, return_models=TRUE, method="ML")
+  picidae.morph.log.fully_reduced.geomean_scaled[[i]] <- sizeScale.pgls(data = picidae.morph.log.fully_reduced[[i]][["data.imputed"]], scale_cols=2:ncol(picidae.morph.log.fully_reduced[[i]][["data.imputed"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1, return_models=TRUE, method="ML")
 }
 rm(i,j,k,l)
 
@@ -704,10 +704,10 @@ rm(i)
 
 ### run phylogenetic PCA on the morphological data
 
-## the function wrappedPhylPCA() is a wrapper to run phylogenetic PCA; it creates the necessary intermediate steps (matrix, treedata), and also calculates the percentage of the variance captured by each PCA
+## the function wrapped.phyl_pca() is a wrapper to run phylogenetic PCA; it creates the necessary intermediate steps (matrix, treedata), and also calculates the percentage of the variance captured by each PCA
 # as input, it takes data (the data as a data frame), pca_cols (the columns on which to conduct phylogenetic PCA), phy (the phylogeny), name_col (the name or number of the column containing taxon names), and method (the method to pass to phyl.pca)
 # it returns a list containing the results of the phylogenetic PCA (an object of class phyl.pca) and a vector of the percent variance explained by each PCA axis
-wrappedPhylPCA <- function(data, pca_cols, phy, name_col, method="lambda") {
+wrapped.phyl_pca <- function(data, pca_cols, phy, name_col, method="lambda") {
   require(geiger)
   require(phytools)
   newdata.matrix <- data.matrix(data[,pca_cols])  # create a matrix version of the data (in order to use geiger::treedata)
@@ -723,7 +723,7 @@ wrappedPhylPCA <- function(data, pca_cols, phy, name_col, method="lambda") {
 picidae.morph.log.fully_reduced.phyl_pca <- list()
 for (i in names(picidae.morph.log.fully_reduced)) {  # loop over individual inclusion
   cat("Starting", i, "\n", sep=" ")
-  picidae.morph.log.fully_reduced.phyl_pca[[i]] <- wrappedPhylPCA(data = picidae.morph.log.fully_reduced[[i]][["data.imputed"]], pca_cols=2:ncol(picidae.morph.log.fully_reduced[[i]][["data.imputed"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1)  # conduct the phylogenetic on the current data set
+  picidae.morph.log.fully_reduced.phyl_pca[[i]] <- wrapped.phyl_pca(data = picidae.morph.log.fully_reduced[[i]][["data.imputed"]], pca_cols=2:ncol(picidae.morph.log.fully_reduced[[i]][["data.imputed"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1)  # conduct the phylogenetic on the current data set
 }
 rm(i)
 
@@ -731,7 +731,7 @@ rm(i)
 picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca <- list()
 for (i in names(picidae.morph.log.fully_reduced.geomean_scaled)) {  # loop over individual inclusion
   cat("Starting", i, "\n", sep=" ")
-  picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]] <- wrappedPhylPCA(data = picidae.morph.log.fully_reduced.geomean_scaled[[i]][["data.geomean_scaled"]], pca_cols=2:ncol(picidae.morph.log.fully_reduced.geomean_scaled[[i]][["data.geomean_scaled"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1)  # conduct the phylogenetic on the current data set
+  picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]] <- wrapped.phyl_pca(data = picidae.morph.log.fully_reduced.geomean_scaled[[i]][["data.geomean_scaled"]], pca_cols=2:ncol(picidae.morph.log.fully_reduced.geomean_scaled[[i]][["data.geomean_scaled"]]), phy=picidae.RAxML.all.BEAST_calibrated.with_proxies, name_col=1)  # conduct the phylogenetic on the current data set
 }
 rm(i)
 
@@ -749,11 +749,10 @@ dev.off()
 
 ### PCA-rotate and geomean-scale the data without phylo, using the rotations and/or models built from data with phylo
 
-
-## the function sizeScalePGLSNoPhylo() uses the models built from PGLS regression of measurements on size to scale data not included in those models because the species are not in the phylogeny
+## the function sizeScale.pgls.noPhylo() uses the models built from PGLS regression of measurements on size to scale data not included in those models because the species are not in the phylogeny
 # as input, it takes model.pgls.traits_geomean (a list of one or more models of individual measurements on size, with names of the list elements matching the names of the columns), data.new (the data to size-scale, which can include data from species with and without phylogenetic information), scale_cols (vector of numbers of columns to size-scale), return_models (boolean to return the model fits), keep_geomean (boolean to retain the geomean column in the returned data frame)
 # it returns either a data frame with the size-scaled data or a list containing the data frame with size-scaled data and the model fits
-sizeScalePGLSNoPhylo <- function(model.pgls.traits_geomean, data.new, scale_cols, return_models=FALSE, keep_geomean=FALSE) {
+sizeScale.pgls.noPhylo <- function(model.pgls.traits_geomean, data.new, scale_cols, return_models=FALSE, keep_geomean=FALSE) {
   # check if models and data to scale are the same, and stop if they aren't
   if (!setequal(names(model.pgls.traits_geomean), colnames(data.new)[scale_cols])) {
     cat("Models and data to be scaled do not match.")
@@ -785,15 +784,15 @@ sizeScalePGLSNoPhylo <- function(model.pgls.traits_geomean, data.new, scale_cols
 ## geomean-scale all the data, iterating over my list of variants
 picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo <- list()
 for (i in names(picidae.morph.log.fully_reduced.geomean_scaled)) {  # loop over individual inclusion
-  picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo[[i]] <- sizeScalePGLSNoPhylo(model.pgls.traits_geomean = picidae.morph.log.fully_reduced.geomean_scaled[[i]]$model.pgls.traits_geomean, data.new=picidae.morph.log.fully_reduced[[i]]$data.imputed, scale_cols=2:ncol(picidae.morph.log.fully_reduced[[i]]$data.imputed))
+  picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo[[i]] <- sizeScale.pgls.noPhylo(model.pgls.traits_geomean = picidae.morph.log.fully_reduced.geomean_scaled[[i]]$model.pgls.traits_geomean, data.new=picidae.morph.log.fully_reduced[[i]]$data.imputed, scale_cols=2:ncol(picidae.morph.log.fully_reduced[[i]]$data.imputed))
 }
 rm(i)
 
 
-## the function rotatePhylPCAnoPhylo() applies the rotation from phyl.pca data with or without phylogenetic information
+## the function rotate.phyl_pca.noPhylo() applies the rotation from phyl.pca to data with or without phylogenetic information
 # phyl.pca by default standardizes by the phylogenetic mean and does not standardize by the variances/sds, so this does, too
 # as input, it takes pca.orig (the PCA generated previously), data.orig (the original data used to generate the PCA, which is necessary in order to properly apply the rotation), pca_cols.orig (the columns from data.orig that were included in the original PCA), phy.orig (the phylogeny used in the original PCA), method.orig (method passed to phyl.pca in the original PCA, necessary for calculating the phylogenetic mean), name_col.orig (name or number of the column in data.orig containing the taxon names), data.new (the data to apply the rotation to), pca_cols.new (the columns of data.new to apply the rotation to), name_col.new (name or number of the column in data.new containing the taxon names)
-rotatePhylPCAnoPhylo <- function(pca.orig, data.orig, pca_cols.orig=NULL, phy.orig, method.orig="lambda", name_col.orig="My_genus_species", data.new, pca_cols.new=NULL, name_col.new="My_genus_species") {
+rotate.phyl_pca.noPhylo <- function(pca.orig, data.orig, pca_cols.orig=NULL, phy.orig, method.orig="lambda", name_col.orig="My_genus_species", data.new, pca_cols.new=NULL, name_col.new="My_genus_species") {
   
   # convert data.orig and data.new to matrices with taxon names as rownames
   if (is.matrix(data.orig)) {
@@ -822,14 +821,14 @@ rotatePhylPCAnoPhylo <- function(pca.orig, data.orig, pca_cols.orig=NULL, phy.or
 ## generate versions of unscaled data rotated by the phylogenetic pca, including data from species without phylogenetic information
 picidae.morph.log.fully_reduced.phyl_pca.inc_no_phylo <- list()
 for (i in names(picidae.morph.log.fully_reduced)) {  # loop over individual inclusion
-  picidae.morph.log.fully_reduced.phyl_pca.inc_no_phylo[[i]] <- rotatePhylPCAnoPhylo(pca.orig = picidae.morph.log.fully_reduced.phyl_pca[[i]]$pca, data.orig = picidae.morph.log.fully_reduced.treedata[[i]]$data, pca_cols.orig = 1:ncol(picidae.morph.log.fully_reduced.treedata[[i]]$data), phy.orig=picidae.morph.log.fully_reduced.treedata[[i]]$phy, data.new=picidae.morph.log.fully_reduced[[i]]$data.imputed, pca_cols.new=2:ncol(picidae.morph.log.fully_reduced[[i]]$data.imputed), method="lambda", name_col.new="My_genus_species")
+  picidae.morph.log.fully_reduced.phyl_pca.inc_no_phylo[[i]] <- rotate.phyl_pca.noPhylo(pca.orig = picidae.morph.log.fully_reduced.phyl_pca[[i]]$pca, data.orig = picidae.morph.log.fully_reduced.treedata[[i]]$data, pca_cols.orig = 1:ncol(picidae.morph.log.fully_reduced.treedata[[i]]$data), phy.orig=picidae.morph.log.fully_reduced.treedata[[i]]$phy, data.new=picidae.morph.log.fully_reduced[[i]]$data.imputed, pca_cols.new=2:ncol(picidae.morph.log.fully_reduced[[i]]$data.imputed), method="lambda", name_col.new="My_genus_species")
 }
 rm(i)
 
 ## generate versions of size-scaled shape data rotated by the phylogenetic pca, including data from species without phylogenetic information
 picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca.inc_no_phylo <- list()
 for (i in names(picidae.morph.log.fully_reduced.geomean_scaled)) {  # loop over individual inclusion
-  picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca.inc_no_phylo[[i]] <- rotatePhylPCAnoPhylo(pca.orig = picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]]$pca, data.orig = picidae.morph.log.fully_reduced.geomean_scaled[[i]]$data.geomean_scaled, pca_cols.orig = 2:ncol(picidae.morph.log.fully_reduced.geomean_scaled[[i]]$data.geomean_scaled), phy.orig=picidae.morph.log.fully_reduced.treedata[[i]]$phy, data.new=picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo[[i]], pca_cols.new=2:ncol(picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo[[i]]), method="lambda", name_col.orig="My_genus_species", name_col.new="My_genus_species")
+  picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca.inc_no_phylo[[i]] <- rotate.phyl_pca.noPhylo(pca.orig = picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]]$pca, data.orig = picidae.morph.log.fully_reduced.geomean_scaled[[i]]$data.geomean_scaled, pca_cols.orig = 2:ncol(picidae.morph.log.fully_reduced.geomean_scaled[[i]]$data.geomean_scaled), phy.orig=picidae.morph.log.fully_reduced.treedata[[i]]$phy, data.new=picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo[[i]], pca_cols.new=2:ncol(picidae.morph.log.fully_reduced.geomean_scaled.inc_no_phylo[[i]]), method="lambda", name_col.orig="My_genus_species", name_col.new="My_genus_species")
 }
 rm(i)
 
@@ -871,9 +870,9 @@ rm(i,j)
 # if I don't use the inc_no_phylo data sets, I can only include taxa for which I have both genetic and morphological data
 # I needed to make this bounded, or identical species (because of missing data) are going to make the values infinite.  I made it scale from 0 to 1, by calculating 1/(1+dist); that way if dist is infinite, the value is 0. if dist is 0, the value is 1
 
-## the function calcSimilarityPairwise() generates a matrix of pairwise similarity (as 1/(1+dist)) for a set of traits, using a list of proxies
+## the function calc.similarity.pairwise() generates a matrix of pairwise similarity (as 1/(1+dist)) for a set of traits, using a list of proxies
 # as input, it takes data (as a matrix of trait values) and proxy_list (a data frame with columns for target taxon and proxy taxon)
-calcSimilarityPairwise <- function(data, proxy_list) {
+calc.similarity.pairwise <- function(data, proxy_list) {
   if (is.vector(data)) data <- as.matrix(data)  # if data is a vector, convert it to a matrix, so that I can calculate distance for single traits
   pairwise.similarity <- matrix(nrow=nrow(proxy_list), ncol=nrow(proxy_list), dimnames=list(proxy_list$My_genus_species, proxy_list$My_genus_species))  # generate an empty matrix to fill in with the pairwise similarity values
   # loops through each taxon-by-taxon pair, and calculates pairwise similarity (as 1/(1+distance))
@@ -889,19 +888,19 @@ calcSimilarityPairwise <- function(data, proxy_list) {
 picidae.morph.euclidean.pairwise <- list()
 for (i in names(picidae.taxon.list.proxies)) {
   # for geomean
-  picidae.morph.euclidean.pairwise[["geomean"]][[i]][["inc_no_phylo"]] <- calcSimilarityPairwise(data=picidae.morph.log.fully_reduced.geomean[[i]], proxy_list=picidae.taxon.list.proxies[[i]][["inc_no_phylo"]])
+  picidae.morph.euclidean.pairwise[["geomean"]][[i]][["inc_no_phylo"]] <- calc.similarity.pairwise(data=picidae.morph.log.fully_reduced.geomean[[i]], proxy_list=picidae.taxon.list.proxies[[i]][["inc_no_phylo"]])
   
   # for unscaled_pca with inc_no_phylo
-  picidae.morph.euclidean.pairwise[["phyl_pca"]][[i]][["inc_no_phylo"]] <- calcSimilarityPairwise(data=picidae.morph.log.fully_reduced.phyl_pca.inc_no_phylo[[i]], proxy_list=picidae.taxon.list.proxies[[i]][["inc_no_phylo"]])
+  picidae.morph.euclidean.pairwise[["phyl_pca"]][[i]][["inc_no_phylo"]] <- calc.similarity.pairwise(data=picidae.morph.log.fully_reduced.phyl_pca.inc_no_phylo[[i]], proxy_list=picidae.taxon.list.proxies[[i]][["inc_no_phylo"]])
 
   # for unscaled_pca with ex_no_phylo
-  picidae.morph.euclidean.pairwise[["phyl_pca"]][[i]][["ex_no_phylo"]] <- calcSimilarityPairwise(data=picidae.morph.log.fully_reduced.phyl_pca[[i]]$pca$S, proxy_list=picidae.taxon.list.proxies[[i]][["ex_no_phylo"]])
+  picidae.morph.euclidean.pairwise[["phyl_pca"]][[i]][["ex_no_phylo"]] <- calc.similarity.pairwise(data=picidae.morph.log.fully_reduced.phyl_pca[[i]]$pca$S, proxy_list=picidae.taxon.list.proxies[[i]][["ex_no_phylo"]])
 
   # for geomean_scaled_pca with inc_no_phylo
-  picidae.morph.euclidean.pairwise[["geomean_scaled.phyl_pca"]][[i]][["inc_no_phylo"]] <- calcSimilarityPairwise(data=picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca.inc_no_phylo[[i]], proxy_list=picidae.taxon.list.proxies[[i]][["inc_no_phylo"]])
+  picidae.morph.euclidean.pairwise[["geomean_scaled.phyl_pca"]][[i]][["inc_no_phylo"]] <- calc.similarity.pairwise(data=picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca.inc_no_phylo[[i]], proxy_list=picidae.taxon.list.proxies[[i]][["inc_no_phylo"]])
   
   # for geomean_scaled_pca with ex_no_phylo
-  picidae.morph.euclidean.pairwise[["geomean_scaled.phyl_pca"]][[i]][["ex_no_phylo"]] <- calcSimilarityPairwise(data=picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]]$pca$S, proxy_list=picidae.taxon.list.proxies[[i]][["ex_no_phylo"]])
+  picidae.morph.euclidean.pairwise[["geomean_scaled.phyl_pca"]][[i]][["ex_no_phylo"]] <- calc.similarity.pairwise(data=picidae.morph.log.fully_reduced.geomean_scaled.phyl_pca[[i]]$pca$S, proxy_list=picidae.taxon.list.proxies[[i]][["ex_no_phylo"]])
 }
 rm(i)
 
@@ -956,10 +955,7 @@ rm(i,j,k,n)
 
 # list of non-Picinae taxa to exclude using grep "Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus"
 
-#### load trees, overlaps, other data, and generate basic functions
-#####
-
-# drop non-Picinae taxa from trees
+## drop non-Picinae taxa from trees
 picinae.RAxML.all.BEAST_calibrated <- drop.tip(picidae.RAxML.all.BEAST_calibrated, tip=grep("Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus", picidae.RAxML.all.BEAST_calibrated$tip.label, value=TRUE))
 picinae.RAxML.all.BEAST_calibrated.no_calibs <- drop.tip(picidae.RAxML.all.BEAST_calibrated.no_calibs, tip=grep("Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus", picidae.RAxML.all.BEAST_calibrated.no_calibs$tip.label, value=TRUE))
 picinae.RAxML.all.BEAST_calibrated.with_proxies <- drop.tip(picidae.RAxML.all.BEAST_calibrated.with_proxies, tip=grep("Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus", picidae.RAxML.all.BEAST_calibrated.with_proxies$tip.label, value=TRUE))
@@ -969,7 +965,6 @@ picinae.RAxML.all.rooted.ladderized <- drop.tip(picidae.RAxML.all.rooted.ladderi
 picinae.RAxML.all.rooted.ladderized.chronos.lambda1 <- drop.tip(picidae.RAxML.all.rooted.ladderized.chronos.lambda1, tip=grep("Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus", picidae.RAxML.all.rooted.ladderized.chronos.lambda1$tip.label, value=TRUE))
 picinae.mrbayes.all.ladderized <- drop.tip(picidae.mrbayes.all.ladderized, tip=grep("Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus", picidae.mrbayes.all.ladderized$tip.label, value=TRUE))
 
-#####
 
 ### read in the morphological data from the database (caliper measurements)
 picinae.morph <- list()
