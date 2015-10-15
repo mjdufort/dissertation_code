@@ -96,7 +96,7 @@ dev.off()
 rm(data.tmp)
 
 ## generate scatterplot matrix for measurements of Colaptes punctigula, to visualize weird differences in size/shape among different measurements
-pdf(file="/Users/MattDufort/Documents/Grad_school/Dissertation_stuff/Picidae_combined_analyses_dist_morph_evol_divers/Picidae_morph_data_checking/Colaptes_punctigula_scatterplot_matrix.pdf", width=40, height=40)
+pdf(file="Colaptes_punctigula_scatterplot_matrix.pdf", width=40, height=40)
 par(mfrow=c(20,20))
 data.tmp <- picidae.morph$log[picidae.morph$log$My_genus_species=="Colaptes_punctigula",15:34]  # extract measurement data for Colaptes punctigula
 for (i in 1:20) {
@@ -353,7 +353,7 @@ rm(i)
 
 ## remove taxa that I won't be using in the analyses, as I don't want them to contribute to the data interpolation
 picidae.taxa.exclude <- list()  # create a list to store taxa to exclude
-picidae.taxa.exclude$not_species <- c("Picidae_misidentified", grep(pattern="/|_x_", rownames(table.picidae.morph_combined.taxa_by_sex$all_vars$all_inds), value=TRUE)) # generate a vector of ambiguous taxa to remove from the morphological data set; this finds hybrids and ambiguous taxa based on the "/" and "_x_" patterns in the names
+picidae.taxa.exclude$not_species <- c("Picidae_misidentified", grep(pattern="/|_x_", rownames(table.picidae.morph_combined.taxa_by_sex$all_inds), value=TRUE)) # generate a vector of ambiguous taxa to remove from the morphological data set; this finds hybrids and ambiguous taxa based on the "/" and "_x_" patterns in the names
 picidae.taxa.exclude$no_phylo <- setdiff(unique(picidae.morph$log$My_genus_species)[order(unique(picidae.morph$log$My_genus_species))], c(picidae.RAxML.all.BEAST_calibrated$tip.label, picidae.taxa.exclude$not_species))  # identify taxa with data but not in phylogeny (and not non-species taxa); treedata does this, but I need it in general for possible use of taxonomic proxies
 picidae.taxa.exclude$no_data <- setdiff(picidae.RAxML.all.BEAST_calibrated$tip.label, unique(picidae.morph$log$My_genus_species))  # identify taxa in the phylogeny but with no measurement data
 
@@ -508,7 +508,7 @@ k <- "all_inds"
 
 ## plot histograms of all measurements for each species, to check data for outliers
 for (i in picidae.species.names) {
-  pdf(file=paste("/Users/MattDufort/Documents/Grad_school/Dissertation_stuff/Picidae_combined_analyses_dist_morph_evol_divers/Picidae_morph_data_checking/interpolated_data_checking/", gsub("/", "_", i), "_histogram_matrix.pdf", sep=""), width=10, height=8)
+  pdf(file=paste(gsub("/", "_", i), "_histogram_matrix.pdf", sep=""), width=10, height=8)
   par(mfrow=c(3,4))
   for (j in 4:14) {
     data.tmp <- picidae.morph_combined.log.reduced_var_inds.imputed[[k]][["data.imputed"]][picidae.morph_combined.log.reduced_var_inds.imputed[[k]][["data.imputed"]]$My_genus_species==i, j]
@@ -949,8 +949,6 @@ for (i in c("geomean", "phyl_pca", "geomean_scaled.phyl_pca")) {
 rm(i,j,k,n)
 
 
-### continue from here
-
 ###### run the analyses for Picinae ######
 
 # list of non-Picinae taxa to exclude using grep "Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus"
@@ -969,7 +967,6 @@ picinae.mrbayes.all.ladderized <- drop.tip(picidae.mrbayes.all.ladderized, tip=g
 ### read in the morphological data from the database (caliper measurements)
 picinae.morph <- list()
 picinae.morph$raw <- picidae.morph$raw[grep("Jynx|Sasia|Verreauxia|Picumnus|Nesoctites|Hemicircus", picidae.morph$raw$My_genus_species, invert=TRUE),]
-
 
 ### to complete analyses for Picinae, use same code as above, replacing picidae with picinae for all variable and file names
 
@@ -1037,26 +1034,27 @@ str(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0)
 str(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled)
 
 for(q in c("geomean","phyl_pca","geomean_scaled.phyl_pca")) {
-  print(cor(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("mytax","migratory","overlaps.scaled")]], picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled[[c("mytax","migratory",q,i,j,k,l,"inc_no_phylo")]]))
+  print(cor(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("migratory","overlaps.scaled")]], picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled[[c("migratory",q,i,j,k,l,"inc_no_phylo")]]))
 }
 rm(q)
 
-pdf(file="/Users/MattDufort/Documents/Grad_school/Dissertation_stuff/Dissertation_chapters/Chapter_3_Diversification_Morph_Evol/Diss_ch3_Fig_???_overlaps_histograms.pdf")
+pdf(file="overlaps_histograms.pdf")
 par(mfrow=c(2,2))
-hist(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("mytax","migratory","overlaps.scaled")]], col="gray", breaks=0:ceiling(max(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("mytax","migratory","overlaps.scaled")]])), xlab="Overlap scaled by focal taxon range size", main=NULL, xlim=c(0,20))
+hist(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("migratory","overlaps.scaled")]], col="gray", breaks=0:ceiling(max(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("migratory","overlaps.scaled")]])), xlab="Overlap scaled by focal taxon range size", main=NULL, xlim=c(0,20))
 xlabs = c("Overlap scaled by average size", "Overlap scaled by unscaled morphologicla data", "Overlap scaled by size-scaled shape data")
 names(xlabs) <- c("geomean","phyl_pca","geomean_scaled.phyl_pca")
 for(q in c("geomean","phyl_pca","geomean_scaled.phyl_pca")) {
-  hist(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled[[c("mytax","migratory",q,i,j,k,l,"inc_no_phylo")]], col="gray", breaks=0:ceiling(max(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled[[c("mytax","migratory",q,i,j,k,l,"inc_no_phylo")]])), xlab=xlabs[q], main=NULL, xlim=c(0,20))
+  hist(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled[[c("migratory",q,i,j,k,l,"inc_no_phylo")]], col="gray", breaks=0:ceiling(max(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0.euclidean_scaled[[c("migratory",q,i,j,k,l,"inc_no_phylo")]])), xlab=xlabs[q], main=NULL, xlim=c(0,20))
 }
 rm(q, xlabs)
 par(opar)
 dev.off()
 
 # histogram of just the overlaps
-pdf(file="/Users/MattDufort/Documents/Grad_school/Dissertation_stuff/Dissertation_chapters/Chapter_3_Diversification_Morph_Evol/Diss_ch3_Fig_2_overlaps_histograms_draft2.pdf")
-hist(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("mytax","migratory","overlaps.scaled")]], col="gray", breaks=0:ceiling(max(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("mytax","migratory","overlaps.scaled")]])), xlab="Overlap scaled by focal taxon range size", main=NULL)
+pdf(file="overlaps_histograms_draft2.pdf")
+hist(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("migratory","overlaps.scaled")]], col="gray", breaks=0:ceiling(max(picidae.summed_overlaps.shp.BirdLife.UnaryUnion.buffer0[[c("migratory","overlaps.scaled")]])), xlab="Overlap scaled by focal taxon range size", main=NULL)
 dev.off()
+
 
 ### plot the data by species, using standard scatterplots and phylomorphospace plots
 
